@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Magic Calculator</title>
+    <style>
+        :root{
+          --bg:#000;
+          --fg:#fff;
+          --muted:#8e8e93;
+          --num:#333333;
+          --func:#a5a5a5;
+          --func-fg:#000;
+          --accent:#FF9500;
+          --ring:rgba(255,255,255,0.15);
+          --chrome:#1c1c1e;
+        }
+
+        *{box-sizing:border-box}
+
+        body{
+          margin:0;
+          background:var(--bg);
+          font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Arial,Helvetica,sans-serif;
+          display:flex;
+          justify-content:center;
+          align-items:center;
+          height:100svh;
+          color-scheme:dark;
+          -webkit-tap-highlight-color:transparent;
+        }
+
+        .calculator{
+          width:100%;
+          max-width:420px;
+          height:100%;
+          display:flex;
+          flex-direction:column;
+          padding:18px 15px 34px;
+        }
+
+        .top-bar{
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          color:#fff;
+          margin-bottom:10px;
+          position: relative;
+        }
+
+        .top-right{
+          display:flex;
+          gap:14px;
+          align-items:center;
+          position: relative;
+        }
+
+        /* Circular chrome icon buttons (history / calculator) */
+        .icon{
+          font-size:20px;
+          font-weight:600;
+          display:inline-flex;
+          justify-content:center;
+          align-items:center;
+          width:40px;
+          height:40px;
+          border-radius:50%;
+          background:var(--chrome);
+          cursor:pointer;
+          border:none;
+          color:#fff;
+        }
+        .icon svg{
+          width:20px;
+          height:20px;
+          display:block;
+        }
+        .icon:active{
+          transform:scale(.92);
+        }
+
+        .display{
+          color:#fff;
+          text-align:right;
+          flex-grow:1;
+          display:flex;
+          flex-direction:column;
+          justify-content:flex-end;
+          padding:10px 0;
+          position:relative;
+        }
+
+        .expression{
+          font-size:64px;
+          font-weight:400;
+          display:flex;
+          justify-content:flex-end;
+          align-items:center;
+          overflow-x:auto;
+          transition:opacity .2s ease;
+          scrollbar-width:none;
+        }
+        .expression::-webkit-scrollbar{display:none}
+
+        .cursor{
+          width:2px;
+          height:52px;
+          background:#fff;
+          margin-left:2px;
+          animation:blink 1s infinite;
+        }
+        @keyframes blink{50%{opacity:0}}
+
+        .result{
+          display:none;
+          font-size:22px;
+          font-weight:400;
+          color:var(--muted);
+          margin-top:2px;
+          position: relative;
+          transform-origin: center bottom;
+        }
+
+        .result.move-up {
+          animation: moveUpStraight 0.35s ease forwards;
+        }
+        @keyframes moveUpStraight {
+          0% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-30px);
+            opacity: 0;
+          }
+        }
+
+        .buttons{
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          gap:10px;
+          margin-top:10px;
+        }
+
+        button{
+          border:none;
+          border-radius:50%;
+          font-size:26px;
+          font-weight:400;
+          padding:0;
+          width:100%;
+          aspect-ratio:1/1;
+          touch-action:manipulation;
+          transition:background .2s,transform .1s,box-shadow .1s,opacity .2s;
+          color:#fff;
+        }
+        button:active{
+          transform:scale(.94);
+          filter:brightness(1.15);
+        }
+
+        .num{background:var(--num)}
+        .func{background:var(--func);color:var(--func-fg)}
+        .equal{background:var(--accent);font-size:30px}
+        .op{background:var(--accent);font-size:30px}
+
+        .sheet{
+          position:fixed;
+          inset:0;
+          display:none;
+          place-items:end center;
+          background:rgba(0,0,0,.35);
+          backdrop-filter:blur(2px);
+          z-index:50;
+        }
+        .sheet.open{display:grid}
+
+        .sheet-card{
+          width:100%;
+          max-width:420px;
+          background:#111;
+          color:#eee;
+          border-radius:18px 18px 0 0;
+          padding:18px 16px 22px;
+          box-shadow:0 -12px 40px rgba(0,0,0,.5);
+          border:1px solid rgba(255,255,255,.06);
+        }
+
+        .sheet-head{
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          margin-bottom:10px;
+        }
+        .sheet-title{font-size:18px;font-weight:600}
+
+        .field{
+          display:grid;
+          grid-template-columns:1fr auto;
+          gap:10px;
+          align-items:center;
+          margin:8px 0 12px;
+        }
+        .field label{
+          color:var(--muted);
+          font-size:13px;
+        }
+        .field input{
+          width:100%;
+          font-size:18px;
+          padding:12px 14px;
+          border-radius:12px;
+          border:1px solid rgba(255,255,255,.08);
+          background:#0b0b0b;
+          color:#fff;
+          outline:none;
+          box-shadow:inset 0 0 0 1px transparent;
+          transition:box-shadow .2s,border-color .2s;
+        }
+        .field input:focus{
+          border-color:var(--ring);
+          box-shadow:0 0 0 6px var(--ring);
+        }
+
+        .row{
+          display:flex;
+          gap:10px;
+          margin-top:8px;
+          flex-wrap:wrap;
+        }
+        .chip{
+          padding:8px 12px;
+          background:#191919;
+          border:1px solid rgba(255,255,255,.06);
+          border-radius:999px;
+          font-size:14px;
+          cursor:pointer;
+          user-select:none;
+        }
+        .chip:active{transform:scale(.98)}
+
+        .sheet-actions{
+          display:flex;
+          gap:10px;
+          margin-top:14px;
+        }
+        .btn{
+          flex:1;
+          padding:12px 14px;
+          border-radius:12px;
+          font-size:16px;
+          border:1px solid rgba(255,255,255,.08);
+          background:#0e0e0e;
+          color:#fff;
+        }
+        .btn.primary{
+          background:var(--accent);
+          border:none;
+          color:#000;
+          font-weight:700;
+        }
+
+        .magic-overlay{
+          position:fixed;
+          inset:0;
+          display:none;
+          z-index:40;
+        }
+        .magic-overlay.armed{display:block}
+
+        .blocked{pointer-events:none;}
+        .buttons.await-eq{pointer-events:none;}
+        .buttons.await-eq [data-role="eq"]{pointer-events:auto;}
+
+        .history-list {
+          max-height: 300px;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+        .history-item {
+          padding: 10px 0;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          font-size: 16px;
+          color: #fff;
+        }
+        .history-item:last-child {
+          border-bottom: none;
+        }
+        .history-item .expr {
+          color: var(--muted);
+          font-size: 14px;
+        }
+        .history-item .res {
+          font-weight: bold;
+          font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="calculator">
+    <div class="top-bar">
+        <!-- top-left: history icon (opens the same history sheet the old three-dot menu opened) -->
+        <button type="button" class="icon" id="historyBtn" aria-label="History">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3.5 2"/>
+            </svg>
+        </button>
+        <div class="top-right">
+            <!-- top-right: calculator icon (purely visual — no function was bound to this control in the original code) -->
+            <button type="button" class="icon" id="calcModeBtn" aria-label="Calculator">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="3" width="16" height="18" rx="2"/>
+                    <line x1="7" y1="7" x2="17" y2="7"/>
+                    <line x1="7" y1="11" x2="7" y2="11"/>
+                    <line x1="12" y1="11" x2="12" y2="11"/>
+                    <line x1="17" y1="11" x2="17" y2="11"/>
+                    <line x1="7" y1="15" x2="7" y2="15"/>
+                    <line x1="12" y1="15" x2="12" y2="15"/>
+                    <line x1="17" y1="15" x2="17" y2="15"/>
+                    <line x1="7" y1="19" x2="7" y2="19"/>
+                    <line x1="12" y1="19" x2="12" y2="19"/>
+                    <line x1="17" y1="19" x2="17" y2="19"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="display">
+        <div class="expression" id="expression">
+            <span id="input">0</span>
+            <div class="cursor"></div>
+        </div>
+        <div class="result" id="result">0</div>
+    </div>
+
+    <div class="buttons" id="buttons">
+        <button class="func" data-role="del">⌫</button>
+        <button class="func" id="acBtn" data-role="ac">AC</button>
+        <button class="func" data-val="%">%</button>
+        <button class="op" data-val="÷">÷</button>
+
+        <button class="num" data-val="7">7</button>
+        <button class="num" data-val="8">8</button>
+        <button class="num" data-val="9">9</button>
+        <button class="op" data-val="×">×</button>
+
+        <button class="num" data-val="4">4</button>
+        <button class="num" data-val="5">5</button>
+        <button class="num" data-val="6">6</button>
+        <button class="op" data-val="-">−</button>
+
+        <button class="num" data-val="1">1</button>
+        <button class="num" data-val="2">2</button>
+        <button class="num" data-val="3">3</button>
+        <button class="op" data-val="+">+</button>
+
+        <button class="num" data-val="00">00</button>
+        <button class="num" data-val="0">0</button>
+        <button class="num" data-val=".">.</button>
+        <button class="equal" data-role="eq">=</button>
+    </div>
+</div>
+
+<!-- Magic Mode Sheet -->
+<div class="sheet" id="sheet">
+    <div class="sheet-card">
+        <div class="sheet-head">
+            <div class="sheet-title">Magic Mode Settings</div>
+            <span class="icon" id="closeSheet" style="width:32px;height:32px;font-size:16px;">✕</span>
+        </div>
+        <div class="field">
+            <div>
+                <label for="forceTotal">Force total</label>
+                <input type="number" id="forceTotal" placeholder="1500"/>
+            </div>
+            <div class="row">
+                <div class="chip" data-preset="500">+500</div>
+                <div class="chip" data-preset="1000">+1000</div>
+                <div class="chip" data-preset="1500">+1500</div>
+            </div>
+        </div>
+        <div class="field">
+            <div>
+                <label for="spectators">Spectator count</label>
+                <input type="number" id="spectators" placeholder="4"/>
+            </div>
+            <div class="row">
+                <div class="chip" data-spec="2">2</div>
+                <div class="chip" data-spec="3">3</div>
+                <div class="chip" data-spec="4">4</div>
+                <div class="chip" data-spec="5">5</div>
+            </div>
+        </div>
+        <div class="sheet-actions">
+            <button class="btn" id="cancelMagic">Cancel</button>
+            <button class="btn primary" id="saveMagic">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- History Sheet -->
+<div class="sheet" id="historySheet">
+    <div class="sheet-card">
+        <div class="sheet-head">
+            <div class="sheet-title">Calculation History</div>
+            <span class="icon" id="closeHistory" style="width:32px;height:32px;font-size:16px;">✕</span>
+        </div>
+        <div class="history-list" id="historyList"></div>
+    </div>
+</div>
+
+<div class="magic-overlay" id="magicOverlay"></div>
+
+<script>
+    // Elements
+    const inputField = document.getElementById("input");
+    const resultField = document.getElementById("result");
+    const exprWrap = document.getElementById("expression");
+    const buttons = document.getElementById("buttons");
+    const acBtn = document.getElementById("acBtn");
+    const sheet = document.getElementById("sheet");
+    const closeSheet = document.getElementById("closeSheet");
+    const saveMagic = document.getElementById("saveMagic");
+    const cancelMagic = document.getElementById("cancelMagic");
+    const forceTotalInput = document.getElementById("forceTotal");
+    const spectatorsInput = document.getElementById("spectators");
+    const magicOverlay = document.getElementById("magicOverlay");
+    const eqBtn = document.querySelector('[data-role="eq"]');
+
+    // History elements (trigger moved from the old three-dot menu to the top-left icon)
+    const historyBtn = document.getElementById("historyBtn");
+    const historySheet = document.getElementById("historySheet");
+    const historyListEl = document.getElementById("historyList");
+    const closeHistory = document.getElementById("closeHistory");
+
+    // State
+    let expression = "";
+    let magicArmed = false;
+    let forceTotal = 0;
+    let totalSpectators = 0;
+    let plusCount = 0;
+    let lastNumberInserted = false;
+    let awaitingEq = false;
+    let acLongPressTimer = null;
+    let eqLongPressTimer = null;
+    let userScrolled = false;
+
+    // Session-based history
+    let historyList = [];
+
+    // Utils
+    function haptic(ms = 15) {
+      try { navigator.vibrate(ms); } catch {}
+    }
+
+    function sanitize(expr) {
+      return expr.replace(/[^0-9+\-*/.%÷×√π()]/g, "").replace(/\b0+(?=\d)/g, "");
+    }
+
+    function safeEvaluate(expr) {
+      const safe = sanitize(expr)
+        .replace(/÷/g, "/")
+        .replace(/×/g, "*")
+        .replace(/%/g, "/100")
+        .replace(/√(\d+(\.\d+)?)/g, "Math.sqrt($1)")
+        .replace(/√\(/g, "Math.sqrt(")
+        .replace(/π/g, "Math.PI");
+      if (!safe) return 0;
+      try { return Function('"use strict";return (' + safe + ')')(); } catch { return NaN; }
+    }
+
+    function formatNumber(num) {
+      if (typeof num !== "number" || !isFinite(num)) {
+        return num > 0 ? "999999999999999" : "-999999999999999";
+      }
+      const str = num.toPrecision(15);
+      const clean = Number(str);
+      return clean.toLocaleString("en-US", {
+        maximumFractionDigits: 15,
+        useGrouping: false
+      });
+    }
+
+    function adjustFontSize(el, maxSize = 64, minSize = 20) {
+      el.style.fontSize = maxSize + "px";
+      while (el.scrollWidth > el.clientWidth && parseInt(el.style.fontSize) > minSize) {
+        el.style.fontSize = (parseInt(el.style.fontSize) - 1) + "px";
+      }
+    }
+
+    function setExpression(text) {
+      expression = text;
+      inputField.textContent = text || "0";
+      updateResult();
+      adjustFontSize(inputField, 64, 24);
+      if (!userScrolled) {
+        setTimeout(() => {
+          exprWrap.scrollLeft = exprWrap.scrollWidth;
+        }, 0);
+      }
+    }
+
+    // Track manual scroll
+    exprWrap.addEventListener("scroll", () => {
+      if (exprWrap.scrollLeft < exprWrap.scrollWidth - exprWrap.clientWidth) {
+        userScrolled = true;
+      } else {
+        userScrolled = false;
+      }
+    });
+
+    // Touch swipe scroll fix for flex-end layout
+    let isTouching = false;
+    let startX = 0;
+    let scrollStart = 0;
+
+    exprWrap.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      isTouching = true;
+      startX = e.touches[0].pageX;
+      scrollStart = exprWrap.scrollLeft;
+      exprWrap.style.justifyContent = "flex-start";
+    }, { passive: true });
+
+    exprWrap.addEventListener("touchmove", (e) => {
+      if (!isTouching) return;
+      const dx = e.touches[0].pageX - startX;
+      exprWrap.scrollLeft = scrollStart - dx;
+      userScrolled = true;
+    }, { passive: true });
+
+    exprWrap.addEventListener("touchend", () => {
+      isTouching = false;
+      setTimeout(() => {
+        exprWrap.style.justifyContent = "flex-end";
+      }, 0);
+    });
+
+    function trimmed(expr) {
+      return (expr || "").replace(/[\+\-\*\/."]+$/g, "");
+    }
+
+    function updateResult() {
+      let t = trimmed(expression);
+      if (!t || /[+\-×÷]$/.test(expression)) t = expression.slice(0, -1);
+      const r = safeEvaluate(t);
+      resultField.textContent = isNaN(r) ? "0" : formatNumber(r);
+      adjustFontSize(resultField, 22, 14);
+    }
+
+    function append(val) {
+      if (magicOverlay.classList.contains("armed") && !lastNumberInserted) return;
+      if (awaitingEq) return;
+      haptic();
+      if (expression === "0") expression = "";
+      if (/[+\-×÷]$/.test(expression) && /[+\-×÷]/.test(val)) {
+        expression = expression.slice(0, -1) + val;
+      } else {
+        expression += val;
+      }
+      inputField.textContent = expression;
+      updateResult();
+      if (!userScrolled) {
+        setTimeout(() => {
+          exprWrap.scrollLeft = exprWrap.scrollWidth;
+        }, 0);
+      }
+      if (exprWrap.scrollLeft >= exprWrap.scrollWidth - exprWrap.clientWidth) {
+        userScrolled = false;
+      }
+      if (magicArmed && val === "+" && /\d$/.test(expression.slice(0, -1))) {
+        plusCount = Math.min(plusCount + 1, Math.max(0, totalSpectators - 1));
+        if (plusCount >= totalSpectators - 1 && !lastNumberInserted) {
+          armLastOverlay();
+        }
+      }
+    }
+
+    function clearAll() {
+      haptic();
+      setExpression("");
+      resultField.textContent = "0";
+      disarmLastOverlay();
+      lastNumberInserted = false;
+      awaitingEq = false;
+      buttons.classList.remove("await-eq");
+    }
+
+    function delChar() {
+      if (magicOverlay.classList.contains("armed") && !lastNumberInserted) return;
+      if (awaitingEq) return;
+      haptic();
+      expression = expression.slice(0, -1);
+      inputField.textContent = expression || "0";
+      updateResult();
+      if (!userScrolled) {
+        setTimeout(() => {
+          exprWrap.scrollLeft = exprWrap.scrollWidth;
+        }, 0);
+      }
+    }
+
+    function calculate() {
+      haptic();
+      const originalExpr = trimmed(expression);
+      const r = (magicArmed && awaitingEq) ? forceTotal : safeEvaluate(expression);
+      let formatted = isNaN(r) ? "Error" : formatNumber(r);
+
+      // Limit to 13 total digits
+      if (!isNaN(r) && isFinite(r)) {
+        let str = r.toString();
+        if (str.includes("e")) {
+          str = str.slice(0, 13);
+        } else {
+          let digits = str.replace("-", "").replace(".", "");
+          if (digits.length > 13) {
+            let needed = 13 - (str.includes(".") ? 1 : 0) - (str.startsWith("-") ? 1 : 0);
+            let cut = str.replace("-", "").slice(0, needed + (str.includes(".") ? 1 : 0));
+            str = (r < 0 ? "-" : "") + cut;
+          }
+        }
+        formatted = str;
+      } else if (!isFinite(r)) {
+        formatted = String(r).slice(0, 13);
+      }
+
+      resultField.classList.add("move-up");
+      setTimeout(() => {
+        resultField.classList.remove("move-up");
+        resultField.textContent = "0";
+      }, 350);
+
+      expression = formatted;
+      inputField.textContent = formatted;
+      resultField.textContent = formatted;
+      adjustFontSize(inputField, 64, 24);
+      if (!userScrolled) {
+        setTimeout(() => {
+          exprWrap.scrollLeft = exprWrap.scrollWidth;
+        }, 0);
+      }
+      resetMagicState();
+
+       // Save to session history
+      saveHistory(originalExpr, formatted);
+    }
+
+    function resetMagicState() {
+      magicArmed = false;
+      plusCount = 0;
+      lastNumberInserted = false;
+      awaitingEq = false;
+      disarmLastOverlay();
+      buttons.classList.remove("await-eq");
+    }
+
+    function blinkAC() {
+      acBtn.animate([
+        { backgroundColor: 'var(--func)' },
+        { backgroundColor: 'var(--accent)' },
+        { backgroundColor: 'var(--func)' }
+      ], { duration: 600, iterations: 1 });
+    }
+
+    function armMagicMode() {
+      if (!forceTotal || !totalSpectators || totalSpectators < 2) return;
+      magicArmed = true;
+      plusCount = 0;
+      lastNumberInserted = false;
+      awaitingEq = false;
+      blinkAC();
+    }
+
+    function armLastOverlay() {
+      magicOverlay.classList.add("armed");
+      buttons.classList.add("blocked");
+    }
+
+    function disarmLastOverlay() {
+      magicOverlay.classList.remove("armed");
+      buttons.classList.remove("blocked");
+    }
+
+    magicOverlay.addEventListener("click", () => {
+      if (!magicArmed || lastNumberInserted) return;
+      haptic(30);
+      const partial = safeEvaluate(trimmed(expression));
+      const current = Number.isFinite(partial) ? partial : 0;
+      const neededRaw = forceTotal - current;
+      if (expression !== "" && !/[+\-×÷]$/.test(expression)) expression += "+";
+      const needed = Math.abs(neededRaw - Math.round(neededRaw)) < 1e-9
+        ? String(Math.round(neededRaw))
+        : String(Number(neededRaw.toFixed(6)));
+      expression += needed;
+      inputField.textContent = expression;
+      resultField.textContent = formatNumber(forceTotal);
+      lastNumberInserted = true;
+      disarmLastOverlay();
+      awaitingEq = true;
+      buttons.classList.add("await-eq");
+    });
+
+    // Keyboard
+    document.addEventListener("keydown", (e) => {
+      if (magicOverlay.classList.contains("armed") && !lastNumberInserted) return;
+      if (awaitingEq && e.key !== "Enter" && e.key !== "=") return;
+      const map = { "/": "÷", "*": "×" };
+      if (!isNaN(e.key) || ".+-*/%".includes(e.key)) append(map[e.key] || e.key);
+      if (e.key === "Enter" || e.key === "=") calculate();
+      if (e.key === "Backspace") delChar();
+    });
+
+    // Button clicks
+    buttons.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const role = btn.dataset.role;
+      const val = btn.dataset.val;
+      if (awaitingEq && role !== "eq") return;
+      if (role === "ac") { clearAll(); return; }
+      if (role === "del") { delChar(); return; }
+      if (role === "eq") { calculate(); return; }
+      if (val != null) { append(val); return; }
+    });
+
+    // Long-press triggers
+    acBtn.addEventListener("pointerdown", () => {
+      clearTimeout(acLongPressTimer);
+      acLongPressTimer = setTimeout(() => {
+        sheet.classList.add("open");
+        haptic(8);
+      }, 650);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(ev => {
+      acBtn.addEventListener(ev, () => clearTimeout(acLongPressTimer));
+    });
+
+    // Long-press Equal → arm magic mode
+    eqBtn.addEventListener("pointerdown", () => {
+      clearTimeout(eqLongPressTimer);
+      eqLongPressTimer = setTimeout(() => {
+        armMagicMode();
+      }, 650);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(ev => {
+      eqBtn.addEventListener(ev, () => clearTimeout(eqLongPressTimer));
+    });
+
+    // Save magic settings
+    saveMagic.addEventListener("click", () => {
+      const ft = Number(forceTotalInput.value);
+      const sc = Number(spectatorsInput.value);
+      if (!Number.isFinite(ft) || ft === 0 || !Number.isInteger(sc) || sc < 2) {
+        shakeSheet();
+        return;
+      }
+      forceTotal = ft;
+      totalSpectators = sc;
+      sheet.classList.remove("open");
+      haptic(12);
+    });
+
+    function shakeSheet() {
+      document.querySelector(".sheet-card")?.animate(
+        [
+          { transform: "translateX(0)" },
+          { transform: "translateX(-6px)" },
+          { transform: "translateX(6px)" },
+          { transform: "translateX(0)" }
+        ],
+        { duration: 220, easing: "ease-out" }
+      );
+      haptic(20);
+    }
+
+    // Close sheet
+    closeSheet.addEventListener("click", () => sheet.classList.remove("open"));
+    cancelMagic.addEventListener("click", () => sheet.classList.remove("open"));
+
+    // Chips
+    document.querySelectorAll(".chip[data-preset]").forEach(c => {
+      c.addEventListener("click", () => {
+        forceTotalInput.value = (
+          Number(forceTotalInput.value || 0) + Number(c.dataset.preset || 0)
+        ).toString();
+        haptic(6);
+      });
+    });
+    document.querySelectorAll(".chip[data-spec]").forEach(c => {
+      c.addEventListener("click", () => {
+        spectatorsInput.value = c.dataset.spec;
+        haptic(6);
+      });
+    });
+
+    /* -------------------------
+       History Feature Logic
+    --------------------------*/
+
+    // Save history in session (full expression + result)
+    function saveHistory(expr, res) {
+      historyList.push({ expr, res });
+      if (historyList.length > 20) historyList.shift();
+    }
+
+    // Show history in smart sheet
+    function showHistory() {
+      historyListEl.innerHTML = "";
+
+      if (!historyList.length) {
+        historyListEl.innerHTML = `<div class="history-item">No history yet</div>`;
+      } else {
+        historyList.forEach(h => {
+          const item = document.createElement("div");
+          item.className = "history-item";
+          item.innerHTML = `<div class="expr">${h.expr}</div><div class="res">${h.res}</div>`;
+          historyListEl.appendChild(item);
+        });
+      }
+
+      historySheet.classList.add("open");
+    }
+
+    // Close history sheet
+    closeHistory.addEventListener("click", () => {
+      historySheet.classList.remove("open");
+    });
+
+    // History icon (top-left) — same behavior the old three-dot menu's "History" item had
+    historyBtn.addEventListener("click", () => {
+      showHistory();
+    });
+</script>
+</body>
+</html>
